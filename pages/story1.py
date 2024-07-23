@@ -50,18 +50,21 @@ llm = ChatOpenAI(
     temperature=0.5
 )
 
-memory = ConversationSummaryBufferMemory(
-    llm=llm,
-    max_token_limit=500,
-    return_messages=True,
-)
+if 'memory' not in st.session_state:
+    st.session_state.memory = ConversationSummaryBufferMemory(
+        llm=llm,
+        max_token_limit=1000,
+        memory_key="history",
+        return_messages=True,
+    )
+
 
 def load_memory(_):
-    return memory.load_memory_variables({})["history"]
+    return st.session_state.memory.load_memory_variables({})["history"]
 
 def invoke_chain(retriever, question):
     result = chain.invoke({"setting_info": retriever, "question": question})
-    memory.save_context(
+    st.session_state.memory.save_context(
         {"inputs": question},
         {"outputs": result.content},
     )
@@ -207,7 +210,7 @@ elif st.session_state.step == 4:
     query = """
          Act as a Narrator of a text based adventure game. Your task is to describe the environment and supporting characters. Use direct speech when support characters are speaking. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best selling author. 무조건 한글로 말하세요.
          
-         상황에 안맞는 이상한 말이나, ! 나 . , 과 같은 게임과 관련이 없는 내용을 받으면 다른 내용은 출력하지 말고 현재 정신력 스텟과 이성 스텟을 출력해.
+         게임과 관련이 없는 내용을 받거나 , . ! 같은 특수 문자로만 구성된 질문을 받으면 다른 내용은 출력하지 말고 캐릭터의 현재 주변이 어떤지 설명하고 게임으로 돌아오라고 말해
     
          kpc는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터입니다. 과한 개입은 불가합니다.
          PC는 당신으로 수정하여 출력하라
@@ -278,6 +281,7 @@ elif st.session_state.step == 4:
         if message:
             send_message(message, "human")
             chain = RunnablePassthrough.assign(history=load_memory) | prompt | llm
+            send_message(st.session_state.memory.load_memory_variables({}), "ai", save=False)
             response = invoke_chain(retriever, message)
             send_message(response.content, "ai")
     else:
