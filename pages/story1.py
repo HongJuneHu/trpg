@@ -282,7 +282,7 @@ elif st.session_state.step == 4:
         if message:
             send_message(message, "human")
             chain = RunnablePassthrough.assign(history=load_memory) | prompt | llm
-            send_message(memory.load_memory_variables({}), "ai", save=False)
+            # send_message(memory.load_memory_variables({}), "ai", save=False)
             response = invoke_chain(retriever, message)
             send_message(response.content, "ai")
     else:
