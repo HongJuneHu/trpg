@@ -5,6 +5,7 @@ from uuid import UUID
 import streamlit as st
 from dotenv import load_dotenv
 
+from operator import itemgetter
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
@@ -15,6 +16,8 @@ from langchain.storage import LocalFileStore
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores.faiss import FAISS
 from langchain.callbacks.base import BaseCallbackHandler
+from langchain.memory import ConversationSummaryBufferMemory
+from langchain.prompts import MessagesPlaceholder
 
 # 환경 변수 로드
 load_dotenv()
@@ -47,6 +50,22 @@ llm = ChatOpenAI(
     temperature=0.5
 )
 
+memory = ConversationSummaryBufferMemory(
+    llm=llm,
+    max_token_limit=500,
+    return_messages=True,
+)
+
+def load_memory(_):
+    return memory.load_memory_variables({})["history"]
+
+def invoke_chain(retriever, question):
+    result = chain.invoke({"setting_info": retriever, "question": question})
+    memory.save_context(
+        {"inputs": question},
+        {"outputs": result.content},
+    )
+    return result
 
 @st.cache_resource(show_spinner="Embedding file...")
 def embed_file(file_path):
@@ -72,7 +91,6 @@ def send_message(message, role, save=True):
         st.markdown(message)
     if save:
         st.session_state['messages'].append({"message": message, "role": role})
-
 
 def paint_history():
     for message in st.session_state['messages']:
@@ -237,6 +255,7 @@ elif st.session_state.step == 4:
         ("system",
          query
          ),
+        MessagesPlaceholder(variable_name="history"),
         ("human", "{question}")
     ])
 
@@ -256,9 +275,8 @@ elif st.session_state.step == 4:
         message = st.chat_input("다음 행동을 입력하세요...")
         if message:
             send_message(message, "human")
-            chain = {"setting_info": retriever, "question": RunnablePassthrough()} | prompt | llm
-
-            response = chain.invoke(message)
+            chain = RunnablePassthrough.assign(history=load_memory) | prompt | llm
+            response = invoke_chain(retriever, message)
             send_message(response.content, "ai")
     else:
         st.session_state["messages"] = []
