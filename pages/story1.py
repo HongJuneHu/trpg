@@ -58,13 +58,14 @@ if 'memory' not in st.session_state:
         return_messages=True,
     )
 
+memory = st.session_state.memory
 
 def load_memory(_):
-    return st.session_state.memory.load_memory_variables({})["history"]
+    return memory.load_memory_variables({})["history"]
 
 def invoke_chain(retriever, question):
     result = chain.invoke({"setting_info": retriever, "question": question})
-    st.session_state.memory.save_context(
+    memory.save_context(
         {"inputs": question},
         {"outputs": result.content},
     )
@@ -281,7 +282,7 @@ elif st.session_state.step == 4:
         if message:
             send_message(message, "human")
             chain = RunnablePassthrough.assign(history=load_memory) | prompt | llm
-            send_message(st.session_state.memory.load_memory_variables({}), "ai", save=False)
+            send_message(memory.load_memory_variables({}), "ai", save=False)
             response = invoke_chain(retriever, message)
             send_message(response.content, "ai")
     else:
