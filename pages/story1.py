@@ -92,6 +92,10 @@ file_path = "./story/파도와_망각.pdf"  # 로컬 파일 경로 지정
 if 'step' not in st.session_state:
     st.session_state.step = 1
 
+def next_step():
+    st.session_state.step += 1
+    st.experimental_rerun()
+
 if st.session_state.step == 1:
     name = st.text_input("당신의 이름을 입력해주세요.", key='name_input')
 
@@ -107,32 +111,32 @@ if st.session_state.step == 1:
 
     if st.button("입력 완료"):
         if name and age and job and face and personality and special:
-            st.session_state.step = 2
             st.session_state["name"] = name
             st.session_state["age"] = age
             st.session_state["job"] = job
             st.session_state["face"] = face
             st.session_state["personality"] = personality
             st.session_state["special"] = special
+            next_step()
         else:
             st.warning("모든 필드를 입력해주세요.")
 
 elif st.session_state.step == 2:
-    int_stat = st.number_input('캐릭터의 지능을 0에서 10사이의 숫자로 매긴다면 몇인가요?',min_value=0, max_value=10)
+    int_stat = st.number_input('캐릭터의 지능을 0에서 10사이의 숫자로 매긴다면 몇인가요?', min_value=0, max_value=10)
 
-    mp = st.number_input('캐릭터의 마력을 0에서 10사이의 숫자로 매긴다면 몇인가요?',min_value=0, max_value=10)
+    mp = st.number_input('캐릭터의 마력을 0에서 10사이의 숫자로 매긴다면 몇인가요?', min_value=0, max_value=10)
 
-    sight = st.number_input('캐릭터의 관찰력을 0에서 10사이의 숫자로 매긴다면 몇인가요?',min_value=0, max_value=10)
+    sight = st.number_input('캐릭터의 관찰력을 0에서 10사이의 숫자로 매긴다면 몇인가요?', min_value=0, max_value=10)
 
-    dex = st.number_input('캐릭터의 민첩을 0에서 10사이의 숫자로 매긴다면 몇인가요?',min_value=0, max_value=10)
+    dex = st.number_input('캐릭터의 민첩성을 0에서 10사이의 숫자로 매긴다면 몇인가요?', min_value=0, max_value=10)
 
     if st.button("입력 완료"):
-        if int_stat and mp and sight and dex:
-            st.session_state.step = 3
+        if int_stat is not None and mp is not None and sight is not None and dex is not None:
             st.session_state["int_stat"] = int_stat
             st.session_state["mp"] = mp
             st.session_state["sight"] = sight
             st.session_state["dex"] = dex
+            next_step()
         else:
             st.warning("모든 필드를 입력해주세요.")
 
@@ -163,7 +167,7 @@ elif st.session_state.step == 3:
     st.subheader("능력치 시트:")
     st.write(st.session_state.stat_sheet)
     if st.button("확인 완료"):
-        st.session_state.step = 4
+        next_step()
 
 elif st.session_state.step == 4:
     st.markdown(
