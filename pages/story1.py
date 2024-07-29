@@ -16,8 +16,11 @@ from langchain.storage import LocalFileStore
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores.faiss import FAISS
 from langchain.callbacks.base import BaseCallbackHandler
-from langchain.memory import ConversationSummaryBufferMemory
+from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import MessagesPlaceholder
+from langchain.document_loaders import PyPDFLoader
+from langchain.text_splitter import CharacterTextSplitter
+
 
 # 환경 변수 로드
 load_dotenv()
@@ -46,21 +49,37 @@ st.set_page_config(
     page_icon="📄"
 )
 
-llm = ChatOpenAI(
-    temperature=0.5
+story_llm = ChatOpenAI(
+    model = 'gpt-4o-mini',
+    temperature=0.5,
+    tiktoken_model_name = 'gpt-3.5-turbo-0613',
+    streaming = True
 )
 
-memory = ConversationSummaryBufferMemory(
-    llm=llm,
-    max_token_limit=500,
-    return_messages=True,
+security_llm = ChatOpenAI(
+    model = 'gpt-4o-mini',
+    temperature=0,
+    tiktoken_model_name = 'gpt-3.5-turbo-0613'
 )
+
+if 'memory' not in st.session_state:
+    st.session_state.memory = ConversationBufferWindowMemory(
+        llm=story_llm,
+        max_token_limit=1500,
+        memory_key="history",
+        return_messages=True,
+    )
+
+if 'first' not in st.session_state:
+    st.session_state.first = True
+
+memory = st.session_state.memory
 
 def load_memory(_):
     return memory.load_memory_variables({})["history"]
 
 def invoke_chain(retriever, question):
-    result = chain.invoke({"setting_info": retriever, "question": question})
+    result = story_chain.invoke({"setting_info": retriever, "question": question})
     memory.save_context(
         {"inputs": question},
         {"outputs": result.content},
@@ -74,8 +93,8 @@ def embed_file(file_path):
     cache_dir = LocalFileStore(f"./.cache/embeddings/{file_path}")
     splitter = CharacterTextSplitter.from_tiktoken_encoder(
         separator="\n",
-        chunk_size=600,
-        chunk_overlap=100,
+        chunk_size=3000,
+        chunk_overlap=500,
     )
     loader = UnstructuredFileLoader(file_path)
     docs = loader.load_and_split(text_splitter=splitter)
@@ -112,7 +131,7 @@ if 'step' not in st.session_state:
 
 def next_step():
     st.session_state.step += 1
-    st.experimental_rerun()
+    st.rerun()
 
 if st.session_state.step == 1:
     name = st.text_input("당신의 이름을 입력해주세요.", key='name_input')
@@ -204,81 +223,84 @@ elif st.session_state.step == 4:
         """
     )
 
-    query = """
-         Act as a Narrator of a text based adventure game. Your task is to describe the environment and supporting characters. Use direct speech when support characters are speaking. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best selling author. 무조건 한글로 말하세요.
-         
-         상황에 안맞는 이상한 말이나, ! 나 . , 과 같은 게임과 관련이 없는 내용을 받으면 다른 내용은 출력하지 말고 현재 정신력 스텟과 이성 스텟을 출력해.
+    story_query = """         
+         KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 따라서 "KPC" 대신 적당한 이름을 생성하여 일관되게 사용하라. 이 이름은 너가 알아서 생성하고, 플레이어의 행동에 과한 개입은 하지 말라.
+         PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라.
+
+         판정을 해야한다면 꼭 Context에서 요구하는 스탯에 대해서만 "[스탯]판정을 해주세요."와 같은 형식의 메시지를 출력하라.
+         판정결과에 따라 성공 또는 실패에 따른 결과를 출력하라.
     
-         kpc는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터입니다. 과한 개입은 불가합니다.
-         PC는 당신으로 수정하여 출력하라
-    
-         D는 다이스(Dice)의 약자입니다. 3D6의 경우, 1부터 6까지의 숫자가 적힌 6면체 주사위를 3회 굴리면 된다고 이해하시면 되겠습니다. CoC에서 탐사자의 특성치(스탯)를 정할 때 굴리게 될 주사위입니다. 
-         마찬가지로 2D6은 6면체 주사위를 2회 굴리면 됩니다. CoC에서 탐사자의 특성치(스탯)를 정할 때 굴리게 될 주사위입니다.
-         D100은 CoC에서 특성치, 기능 등을 판정할 때, 즉 어떤 행동의 성공/실패 여부를 판정할 때 주로 사용하는 주사위입니다. 100면체 주사위를 1회 굴리는 것입니다.
-         주사위의 결과가 기준치 이하면 성공, 기준치를 초과하면 실패입니다. 기본은 이렇고, 서로 대항해야 하는 상황에서는 성공 수준을 비교합니다.
-         펌블(대실패) : 주사위 값으로 행동(특성치나 기능 판정)의 성공·실패 여부를 판정하는 CoC에서, 96~100 혹은 100의 결과값은 대실패로 처리합니다. 그냥 실패보다 훨씬 더 나쁜 결과를 낳으며, 기본적으로 효과를 바로 적용하고, 강행(재시도)를 할 수 없습니다. 대실패로 벌어지는 일은 수호자가 결정합니다. 
-         이성 0/1D3 상실이라는 말은 이성 판정을 해서 성공 시 / 앞의 0만큼의 이성을, 실패 시 / 뒤의 1D3(주사위를 굴립니다)만큼의 이성을 줄이라는 뜻입니다.
-         정신력이나 이성 판정을 할 때 특별한 판정 규칙이 없다면 1D100주사위를 굴려서 50초과면 성공, 50이하면 실패로 판정하라
-         판정을 굴릴 때 주사위를 굴리고 그에따른 주사위 결과도 출력하라. 판정 결과 성공하면 정신력이나 이성을 감소시키지않고, 실패하면 규칙에 따라 현재 스탯에서 정신력이나 이성을 감소시켜라
-    
-         판정 결과 출력 예시 : 
-    
-         정신력 판정 - 1D100
-         결과 - 52 성공!
-    
-         지능 판정 - 1D10
-         결과 - 5 실패!
-    
-         이성 판정 - 1/1D2
-         결과 - 1 성공!
-    
-         마지막 부분에 항상 현재 정신력과 이성을 출력하라.
-         출력할 때 정신력과 이성만 출력하라.
-    
-         현재 스탯 출력 예시 : 
-    
-         현재 상태
-         정신력 - 10
-         이성 - 10
-    
-         현재 상태
-         정신력 - 7
-         이성 - 3
-    
+         이야기의 흐름은 반드시 주어진 Context의 도입, 1일차 저녁, 2일차 오전, 2일차 오후, 3일차 오전 10시 순서로 따라가야한다. 또한 사용자의 명령에는 반응하되 진행하는 내용은 반드시 Context의 내용을 따라가야한다.
+         대답의 시작 부분에는 '[도입]' '[1일차 저녁]' 과 같이 게임 상 시간을 알려줘야한다.
+         Following the storyline of the Context below, you are to act as a Narrator of a text-based adventure game. Your task is to describe the environment and supporting characters. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best-selling author. 무조건 한글로 말하세요.
          ----------
-    
-        {setting_info}
+         Context : 
+         {setting_info}
          """
 
-    query += st.session_state.character_sheet
-    query = query + "\n" + st.session_state.stat_sheet
+    story_query += "플레이어의 캐릭터 : \n" + st.session_state.character_sheet
 
-    prompt = ChatPromptTemplate.from_messages([
+    story_prompt = ChatPromptTemplate.from_messages([
         ("system",
-         query
+         story_query
          ),
         MessagesPlaceholder(variable_name="history"),
         ("human", "{question}")
     ])
 
-    if file_path:
-        retriever = embed_file(file_path)
+    security_query = """
+            너는 TRPG 게임의 입력으로 알맞는지 판단하는 분류 모델 역할을 수행할거야.
+            입력이 게임과 전혀 상관 없거나 상황과 완전히 어울리지 않는 행동을 입력하면 '1'을 반환하고 게임과 관련된 질문이나 무엇을 할 수 있는지 물어보거나 주어진 게임 상황에서 할 수 있는 행동을 입력 받으면 '0'을 반환해.
+            
+            현재 상황은 다음과 같다.
+            
+            {abstract}
+            """
 
-        send_message("""
+    security_prompt = ChatPromptTemplate.from_messages([
+        ("system",
+         security_query
+         ),
+        ("human", "{question}")
+    ])
+
+    retriever = embed_file(file_path)
+    if st.session_state.first:
+        start_message = """
         당신은 머리가 어지러워지면서 동시에 바닷속으로 빠지는 듯한 감각을 느낍니다...
         발밑이 크게 흔들리더니 딛고 있던 것이 사라집니다.
         무언가 당신의 발목을 꽉 붙듭니다. 강한 인력 같은 힘이 발목을 쥐어짜듯 휘감아 당깁니다.
         아래로 쑥 빨려들어가는 느낌과 함께 어둑한 물이 온몸을 덮칩니다.
         어느덧 머리끝까지 잠긴 물 속에서 이상한 물체가 눈에 들어오기 시작합니다.
         다리, 몸통, …옷? 꼭 사람의 신체 같은 그것에서 거품이 오르고 있습니다.
-        저것이 사람이고, 거품이 올라오고 있다면 아직 살아 있다는 뜻일 텐데….
-        """, "ai", save=False)
+        저것이 사람이고, 거품이 올라오고 있다면 아직 살아 있다는 뜻일 텐데…\n
+        [정신력] 판정합니다.
+        """
+        send_message(start_message, "ai", save=True)
+
+        message = st.chat_input("다음 행동을 입력하세요...")
+        memory.save_context(
+            {"inputs": '게임 시작'},
+            {"outputs": start_message}
+        )
+        st.session_state.first = False
+    else:
         paint_history()
         message = st.chat_input("다음 행동을 입력하세요...")
         if message:
             send_message(message, "human")
-            chain = RunnablePassthrough.assign(history=load_memory) | prompt | llm
-            response = invoke_chain(retriever, message)
-            send_message(response.content, "ai")
-    else:
-        st.session_state["messages"] = []
+            security_chain = {"question": RunnablePassthrough()} | RunnablePassthrough.assign(abstract = load_memory) | security_prompt | security_llm
+            security_respose = security_chain.invoke(message)
+            if security_respose.content == '0':
+                story_chain = {"setting_info" : retriever, "question":RunnablePassthrough()} | RunnablePassthrough.assign(history=load_memory) | story_prompt | story_llm
+                response = story_chain.invoke(message)
+                memory.save_context(
+                    {"inputs": message},
+                    {"outputs": response.content},
+                )
+                # send_message(memory.load_memory_variables({})["history"], "ai")
+                # send_message(memory.load_memory_variables({}), "ai", save=False)
+                #response = invoke_chain(retriever, message)
+                send_message(response.content, "ai")
+            else:
+                send_message("잘못된 입력입니다.", "ai")
