@@ -127,44 +127,53 @@ def format_docs(docs):
 
 def dice_roll(sentence):
     dice_result = random.randrange(1, 11)
+    update_sidebar()  # 초기 사이드바 업데이트
     if "정신력" in sentence:
-        if dice_result<6:
+        if dice_result < 6:
             st.session_state['sanity'] -= 1
+            update_sidebar()  # 스탯 변동 후 사이드바 업데이트
             return f"주사위 결과 : {dice_result}, [정신력] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [정신력] 판정 성공"
     elif "체력" in sentence:
-        if dice_result<6:
+        if dice_result < 6:
             st.session_state['health'] -= 1
+            update_sidebar()  # 스탯 변동 후 사이드바 업데이트
             return f"주사위 결과 : {dice_result}, [체력] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [체력] 판정 성공"
     elif "지능" in sentence:
-        if dice_result>st.session_state['int_stat']:
+        if dice_result > st.session_state['int_stat']:
             return f"주사위 결과 : {dice_result}, [지능] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [지능] 판정 성공"
     elif "이성" in sentence:
-        if dice_result<6:
+        if dice_result < 6:
             st.session_state['mental'] -= 1
+            update_sidebar()  # 스탯 변동 후 사이드바 업데이트
             return f"주사위 결과 : {dice_result}, [이성] 판정 실패\n 현재 상태 :\n 이성 : {st.session_state['mental']}"
         else:
             return f"주사위 결과 : {dice_result}, [이성] 판정 성공\n 현재 상태 :\n 이성 : {st.session_state['mental']}"
     elif "마력" in sentence:
-        if dice_result>st.session_state['mp']:
+        if dice_result > st.session_state['mp']:
             return f"주사위 결과 : {dice_result}, [마력] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [마력] 판정 성공"
     elif "관찰력" in sentence:
-        if dice_result>st.session_state['sight']:
+        if dice_result > st.session_state['sight']:
             return f"주사위 결과 : {dice_result}, [관찰력] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [관찰력] 판정 성공"
     elif "민첩" in sentence:
-        if dice_result>st.session_state['dex']:
+        if dice_result > st.session_state['dex']:
             return f"주사위 결과 : {dice_result}, [민첩] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [민첩] 판정 성공"
+    elif "근력" in sentence:
+        if dice_result > 6:
+            return f"주사위 결과 : {dice_result}, [근력] 판정 실패"
+        else:
+            return f"주사위 결과 : {dice_result}, [근력] 판정 성공"
 
 # ai의 메시지를 받으면 마지막 문장에 판정이라는 단어가 있는지 확인하고 있으면 다이스굴리기, 있을 경우 다이스 결과를 human으로, 결과에 따른 ai메시지를 반환해야함
 # def is_dice(chain, input, sentence):
@@ -221,6 +230,13 @@ if 'kpc_name' not in st.session_state:
 def next_step():
     st.session_state.step += 1
     st.rerun()
+
+def update_sidebar():
+    with st.sidebar:
+        st.title("현재 상태 : ")
+        st.header("체력 : " + ("♥" * st.session_state['health']) + ("♡" * (3 - st.session_state['health'])))
+        st.header("정신력 : " + ("●" * st.session_state['sanity']) + ("○" * (3 - st.session_state['sanity'])))
+        st.header("이성 : " + ("■" * st.session_state['mental']) + ("□" * (3 - st.session_state['mental'])))
 
 if st.session_state.step == 1:
     name = st.text_input("당신의 이름을 입력해주세요.", key='name_input')
@@ -302,7 +318,10 @@ elif st.session_state.step == 3:
     if st.button("확인 완료"):
         next_step()
 
+
+
 elif st.session_state.step == 4:
+    update_sidebar()
     st.markdown(
         """
         세상이 멸망한 지도 벌써 10여 년이 흘렀습니다.
@@ -319,7 +338,7 @@ elif st.session_state.step == 4:
         """
     )
 
-    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라. KPC의 이름은 {st.session_state.kpc_name}이다.\n"
+    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라. KPC의 이름은 {st.session_state.kpc_name}이다. {st.session_state.kpc_name}으로 수정하여 출력하라.\n"
 
     story_query = """
          KPC는 플레이어가 Context의 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라.
@@ -366,11 +385,7 @@ elif st.session_state.step == 4:
     ])
 
 
-    with st.sidebar:
-        st.title("현재 상태 : ")
-        st.header("체력 : " + ("❤"*st.session_state['health']) + ("🤍"*(3-st.session_state['health'])))
-        st.header("정신력 : " + ("⚫"*st.session_state['health']) + ("⚪"*(3-st.session_state['health'])))
-        st.header("이성 : " + ("⬛"*st.session_state['health']) + ("⬜"*(3-st.session_state['health'])))
+
 
     retriever = embed_file(file_path)
     story_chain = {"setting_info": retriever, "question": RunnablePassthrough()} | RunnablePassthrough.assign(
@@ -409,8 +424,8 @@ elif st.session_state.step == 4:
                     {"inputs": dice_result},
                     {"outputs": response.content},
                 )
-                # response.content = response.content.replace('KPC', st.session_state.kpc_name)
                 send_message(response.content, role='ai', save=True)
+                update_sidebar()  # 스탯 변동 후 사이드바 업데이트
                 if check_dice_roll_required(response.content):
                     st.rerun()
             message = st.chat_input("다음 행동을 입력하세요...")
