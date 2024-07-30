@@ -128,10 +128,17 @@ def format_docs(docs):
 def dice_roll(sentence):
     dice_result = random.randrange(1, 11)
     if "정신력" in sentence:
-        if dice_result>st.session_state['sanity']:
+        if dice_result<6:
+            st.session_state['sanity'] -= 1
             return f"주사위 결과 : {dice_result}, [정신력] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [정신력] 판정 성공"
+    elif "체력" in sentence:
+        if dice_result<6:
+            st.session_state['health'] -= 1
+            return f"주사위 결과 : {dice_result}, [체력] 판정 실패"
+        else:
+            return f"주사위 결과 : {dice_result}, [체력] 판정 성공"
     elif "지능" in sentence:
         if dice_result>st.session_state['int_stat']:
             return f"주사위 결과 : {dice_result}, [지능] 판정 실패"
@@ -241,9 +248,11 @@ if st.session_state.step == 1:
             st.warning("모든 필드를 입력해주세요.")
 
 elif st.session_state.step == 2:
-    mental = 10
+    health = 3
 
-    sanity = st.number_input('캐릭터의 정신력을 0에서 10사이의 숫자로 매긴다면 몇인가요?', min_value=0, max_value=10)
+    mental = 3
+
+    sanity = 3
 
     int_stat = st.number_input('캐릭터의 지능을 0에서 10사이의 숫자로 매긴다면 몇인가요?', min_value=0, max_value=10)
 
@@ -255,6 +264,7 @@ elif st.session_state.step == 2:
 
     if st.button("입력 완료"):
         if int_stat is not None and mp is not None and sight is not None and dex is not None:
+            st.session_state['health'] = health
             st.session_state['sanity'] = sanity
             st.session_state['mental'] = mental
             st.session_state["int_stat"] = int_stat
@@ -273,6 +283,7 @@ elif st.session_state.step == 3:
     """
 
     st.session_state.stat_sheet = f"""
+    체력 : {st.session_state['health']}\n
     정신력 : {st.session_state['sanity']}\n
     지능 : {st.session_state["int_stat"]}\n
     이성 : {st.session_state['mental']}\n
@@ -308,11 +319,10 @@ elif st.session_state.step == 4:
         """
     )
 
-    # temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라. KPC의 이름은 {st.session_state.kpc_name}이다.\n"
-    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라. KPC의 이름은 간달프이다.\n"
+    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라. KPC의 이름은 {st.session_state.kpc_name}이다.\n"
 
     story_query = """
-         KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라.
+         KPC는 플레이어가 Context의 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라.
          PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라.
 
          판정을 해야한다면 꼭 Context에서 요구하는 스탯에 대해서만 "[스탯]판정을 해주세요."와 같은 형식의 메시지를 출력하라.
@@ -320,6 +330,7 @@ elif st.session_state.step == 4:
     
          이야기의 흐름은 반드시 주어진 Context의 스토리 진행 순서대로 따라가야한다. 또한 플레이어의 명령에는 반응하되 플레이어의 캐릭터의 대사를 생성하거나 행동을 조종하지 않으며, 진행하는 내용은 반드시 Context의 내용을 따라가야한다.
          대답의 시작 부분에는 '[도입]' '[1일차 저녁]' 과 같이 게임 상 시간을 알려줘야한다. 주사위 판정이 필요할 때 (1/1D2)와 같은 내용은 출력하지 않는다.
+         
          Following the storyline of the Context below, you are to act as a Narrator of a text-based adventure game. Your task is to describe the environment and supporting characters. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best-selling author. 무조건 한글로 말하세요.
          ----------
          Context : 
@@ -353,6 +364,13 @@ elif st.session_state.step == 4:
          ),
         ("human", "{question}")
     ])
+
+
+    with st.sidebar:
+        st.title("현재 상태 : ")
+        st.header("체력 : " + ("❤"*st.session_state['health']) + ("🤍"*(3-st.session_state['health'])))
+        st.header("정신력 : " + ("⚫"*st.session_state['health']) + ("⚪"*(3-st.session_state['health'])))
+        st.header("이성 : " + ("⬛"*st.session_state['health']) + ("⬜"*(3-st.session_state['health'])))
 
     retriever = embed_file(file_path)
     story_chain = {"setting_info": retriever, "question": RunnablePassthrough()} | RunnablePassthrough.assign(
