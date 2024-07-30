@@ -62,6 +62,12 @@ security_llm = ChatOpenAI(
     tiktoken_model_name = 'gpt-3.5-turbo-0613'
 )
 
+name_llm = ChatOpenAI(
+    model = 'gpt-4o-mini',
+    temperature=1,
+    tiktoken_model_name = 'gpt-3.5-turbo-0613'
+)
+
 if 'memory' not in st.session_state:
     st.session_state.memory = ConversationBufferWindowMemory(
         llm=story_llm,
@@ -202,6 +208,9 @@ file_path = "./story/파도와_망각.pdf"  # 로컬 파일 경로 지정
 if 'step' not in st.session_state:
     st.session_state.step = 1
 
+if 'kpc_name' not in st.session_state:
+    st.session_state.kpc_name = name_llm.invoke("답변은 \"니콜\", \"마이클\", \"김수혁\" 같이 사람 이름으로만 해서 사람 이름 하나 만들어줘").content
+
 def next_step():
     st.session_state.step += 1
     st.rerun()
@@ -299,6 +308,9 @@ elif st.session_state.step == 4:
         """
     )
 
+    # temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라. KPC의 이름은 {st.session_state.kpc_name}이다.\n"
+    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라. KPC의 이름은 간달프이다.\n"
+
     story_query = """
          KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라.
          PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라.
@@ -307,13 +319,14 @@ elif st.session_state.step == 4:
          판정결과에 따라 성공 또는 실패에 따른 결과를 출력하라.
     
          이야기의 흐름은 반드시 주어진 Context의 스토리 진행 순서대로 따라가야한다. 또한 플레이어의 명령에는 반응하되 플레이어의 캐릭터의 대사를 생성하거나 행동을 조종하지 않으며, 진행하는 내용은 반드시 Context의 내용을 따라가야한다.
-         대답의 시작 부분에는 '[도입]' '[1일차 저녁]' 과 같이 게임 상 시간을 알려줘야한다.
+         대답의 시작 부분에는 '[도입]' '[1일차 저녁]' 과 같이 게임 상 시간을 알려줘야한다. 주사위 판정이 필요할 때 (1/1D2)와 같은 내용은 출력하지 않는다.
          Following the storyline of the Context below, you are to act as a Narrator of a text-based adventure game. Your task is to describe the environment and supporting characters. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best-selling author. 무조건 한글로 말하세요.
          ----------
          Context : 
          {setting_info}
          """
 
+    story_query = temp_query + story_query
     story_query += "플레이어의 캐릭터 : \n" + st.session_state.character_sheet
 
     story_prompt = ChatPromptTemplate.from_messages([
@@ -326,7 +339,8 @@ elif st.session_state.step == 4:
 
     security_query = """
             너는 TRPG 게임의 입력으로 알맞는지 판단하는 분류 모델 역할을 수행할거야.
-            입력이 게임과 전혀 상관 없거나 상황과 완전히 어울리지 않는 행동을 입력하면 '1'을 반환하고 게임과 관련된 질문이나 무엇을 할 수 있는지 물어보거나 주어진 게임 상황에서 할 수 있는 행동을 입력 받으면 '0'을 반환해.
+            '.', ',', '!' 같은 무의미한 입력이나 주어진 상황에서 전혀 맞지 않는 행동을 하면 '1'을 반환하고 게임과 관련된 질문이나 무엇을 할 수 있는지 물어보거나 주어진 게임 상황에서 할 수 있는 행동을 입력 받으면 '0'을 반환해.
+            다만 정말 아주 조금도 상황에 적용될 여지가 있으면 '0'을 반환해.
             
             현재 상황은 다음과 같다.
             
@@ -377,12 +391,14 @@ elif st.session_state.step == 4:
                     {"inputs": dice_result},
                     {"outputs": response.content},
                 )
+                # response.content = response.content.replace('KPC', st.session_state.kpc_name)
                 send_message(response.content, role='ai', save=True)
                 if check_dice_roll_required(response.content):
                     st.rerun()
             message = st.chat_input("다음 행동을 입력하세요...")
             if message:
                 send_message(message, "human")
+                # message = message.replace(st.session_state.kpc_name, 'KPC')
                 security_chain = {"question": RunnablePassthrough()} | RunnablePassthrough.assign(
                     abstract=load_memory) | security_prompt | security_llm
                 security_response = security_chain.invoke(message)
@@ -392,6 +408,7 @@ elif st.session_state.step == 4:
                         {"inputs": message},
                         {"outputs": response.content},
                     )
+                    # response.content = response.content.replace('KPC', st.session_state.kpc_name)
                     send_message(response.content, "ai", save=True)
                     if check_dice_roll_required(response.content):
                         st.rerun()
