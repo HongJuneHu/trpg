@@ -120,37 +120,38 @@ def format_docs(docs):
     return "\n\n".join(document.page_content for document in docs)
 
 def dice_roll(sentence):
+    dice_result = random.randrange(1, 11)
     if "정신력" in sentence:
-        if random.randrange(1,11)>st.session_state['sanity']:
-            return "[정신력] 판정 실패"
+        if dice_result>st.session_state['sanity']:
+            return f"주사위 결과 : {dice_result}, [정신력] 판정 실패"
         else:
-            return "[정신력] 판정 성공"
+            return f"주사위 결과 : {dice_result}, [정신력] 판정 성공"
     elif "지능" in sentence:
-        if random.randrange(1,11)>st.session_state['int_stat']:
-            return "[지능] 판정 실패"
+        if dice_result>st.session_state['int_stat']:
+            return f"주사위 결과 : {dice_result}, [지능] 판정 실패"
         else:
-            return "[지능] 판정 성공"
+            return f"주사위 결과 : {dice_result}, [지능] 판정 성공"
     elif "이성" in sentence:
-        if random.randrange(1,11)<6:
+        if dice_result<6:
             st.session_state['mental'] -= 1
-            return "[이성] 판정 실패"
+            return f"주사위 결과 : {dice_result}, [이성] 판정 실패\n 현재 상태 :\n 이성 : {st.session_state['mental']}"
         else:
-            return "[이성] 판정 성공"
+            return f"주사위 결과 : {dice_result}, [이성] 판정 성공\n 현재 상태 :\n 이성 : {st.session_state['mental']}"
     elif "마력" in sentence:
-        if random.randrange(1,11)>st.session_state['mp']:
-            return "[마력] 판정 실패"
+        if dice_result>st.session_state['mp']:
+            return f"주사위 결과 : {dice_result}, [마력] 판정 실패"
         else:
-            return "[마력] 판정 성공"
+            return f"주사위 결과 : {dice_result}, [마력] 판정 성공"
     elif "관찰력" in sentence:
-        if random.randrange(1,11)>st.session_state['sight']:
-            return "[관찰력] 판정 실패"
+        if dice_result>st.session_state['sight']:
+            return f"주사위 결과 : {dice_result}, [관찰력] 판정 실패"
         else:
-            return "[관찰력] 판정 성공"
+            return f"주사위 결과 : {dice_result}, [관찰력] 판정 성공"
     elif "민첩" in sentence:
-        if random.randrange(1,11)>st.session_state['dex']:
-            return "[민첩] 판정 실패"
+        if dice_result>st.session_state['dex']:
+            return f"주사위 결과 : {dice_result}, [민첩] 판정 실패"
         else:
-            return "[민첩] 판정 성공"
+            return f"주사위 결과 : {dice_result}, [민첩] 판정 성공"
 
 # ai의 메시지를 받으면 마지막 문장에 판정이라는 단어가 있는지 확인하고 있으면 다이스굴리기, 있을 경우 다이스 결과를 human으로, 결과에 따른 ai메시지를 반환해야함
 def is_dice(chain, input, sentence):
@@ -158,18 +159,24 @@ def is_dice(chain, input, sentence):
         {"inputs": input},
         {"outputs": sentence},
     )
-    last_sentence = sentence.split('\n')[-1]
-    if '판정' in last_sentence:
-        if st.button("주사위 굴리기"):
-            dice_result = dice_roll(last_sentence)
-            send_message(dice_result, role='human', save=True)
-            response = chain.invoke(dice_result)
-            memory.save_context(
-                {"inputs": dice_result},
-                {"outputs": response.content},
-            )
-            return response
+    last_sentence = sentence.split('\n')
+    temp_sentence=[]
+    for i in range(len(last_sentence)):
+        if '판정' in last_sentence[i]:
+            temp_sentence.append(last_sentence[i])
+    if '판정' in temp_sentence[-1]:
+        send_message("1",role='ai')
+        dice_result = dice_roll(temp_sentence[-1])
+        send_message(dice_result, role='human', save=True)
+        response = chain.invoke(dice_result)
+        memory.save_context(
+            {"inputs": dice_result},
+            {"outputs": response.content},
+        )
+        send_message(response.content, role='ai', save=True)
+        return response
     else:
+        send_message("2",role='ai')
         return sentence
 
 st.title("파도와 망각")
@@ -336,12 +343,13 @@ elif st.session_state.step == 4:
         """
         send_message(start_message, "ai", save=True)
         start_message = is_dice(story_chain, "게임시작", start_message)
-        message = st.chat_input("다음 행동을 입력하세요...")
+        # message = st.chat_input("다음 행동을 입력하세요...")
         st.session_state.first = False
         st.rerun()
     else:
         paint_history()
-
+        # send_message(st.session_state['messages'][-1],role='ai')
+        response = is_dice(story_chain, st.session_state['messages'][-2]['message'],st.session_state['messages'][-1]['message'])
         message = st.chat_input("다음 행동을 입력하세요...")
         if message:
             send_message(message, "human")
