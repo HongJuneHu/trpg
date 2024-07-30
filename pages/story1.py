@@ -154,30 +154,43 @@ def dice_roll(sentence):
             return f"주사위 결과 : {dice_result}, [민첩] 판정 성공"
 
 # ai의 메시지를 받으면 마지막 문장에 판정이라는 단어가 있는지 확인하고 있으면 다이스굴리기, 있을 경우 다이스 결과를 human으로, 결과에 따른 ai메시지를 반환해야함
-def is_dice(chain, input, sentence):
-    memory.save_context(
-        {"inputs": input},
-        {"outputs": sentence},
-    )
-    last_sentence = sentence.split('\n')
-    temp_sentence=[]
+# def is_dice(chain, input, sentence):
+#     memory.save_context(
+#         {"inputs": input},
+#         {"outputs": sentence},
+#     )
+#     last_sentence = sentence.split('\n')
+#     temp_sentence=["0"]
+#     for i in range(len(last_sentence)):
+#         if '판정' in last_sentence[i]:
+#             temp_sentence.append(last_sentence[i])
+#     if '판정' in temp_sentence[-1]:
+#         st.session_state['pending_dice_roll'] = True
+#         st.session_state['pending_dice_sentence'] = temp_sentence[-1]
+#         send_message("주사위 판정이 필요합니다.", role='ai')
+#     else:
+#         st.session_state['pending_dice_roll'] = False
+#         return sentence
+
+def check_dice_roll_required(text):
+    last_sentence = text.split('\n')
+    temp_sentence = ["0"]
     for i in range(len(last_sentence)):
         if '판정' in last_sentence[i]:
             temp_sentence.append(last_sentence[i])
     if '판정' in temp_sentence[-1]:
-        send_message("1",role='ai')
-        dice_result = dice_roll(temp_sentence[-1])
-        send_message(dice_result, role='human', save=True)
-        response = chain.invoke(dice_result)
-        memory.save_context(
-            {"inputs": dice_result},
-            {"outputs": response.content},
-        )
-        send_message(response.content, role='ai', save=True)
-        return response
-    else:
-        send_message("2",role='ai')
-        return sentence
+        st.session_state['pending_dice_roll'] = True
+        st.session_state['pending_dice_sentence'] = temp_sentence[-1]
+        send_message("주사위 판정이 필요합니다.", role='ai')
+        return True
+    return False
+
+def is_dice(input, sentence):
+    memory.save_context(
+        {"inputs": input},
+        {"outputs": sentence},
+    )
+    return check_dice_roll_required(sentence)
 
 st.title("파도와 망각")
 
@@ -287,7 +300,7 @@ elif st.session_state.step == 4:
     )
 
     story_query = """
-         KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 따라서 "KPC"라는 캐릭터를 대체할 수 있는 캐릭터을 생성하여 일관되게 사용하라. 이 이름은 너가 알아서 생성하고, 플레이어의 행동에 과한 개입은 하지 말라.
+         KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라.
          PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라.
 
          판정을 해야한다면 꼭 Context에서 요구하는 스탯에 대해서만 "[스탯]판정을 해주세요."와 같은 형식의 메시지를 출력하라.
@@ -342,29 +355,45 @@ elif st.session_state.step == 4:
         [정신력] 판정합니다.
         """
         send_message(start_message, "ai", save=True)
-        start_message = is_dice(story_chain, "게임시작", start_message)
+        start_message = is_dice("게임시작", start_message)
         # message = st.chat_input("다음 행동을 입력하세요...")
         st.session_state.first = False
         st.rerun()
     else:
         paint_history()
-        # send_message(st.session_state['messages'][-1],role='ai')
-        response = is_dice(story_chain, st.session_state['messages'][-2]['message'],st.session_state['messages'][-1]['message'])
-        message = st.chat_input("다음 행동을 입력하세요...")
-        if message:
-            send_message(message, "human")
-            security_chain = {"question": RunnablePassthrough()} | RunnablePassthrough.assign(abstract = load_memory) | security_prompt | security_llm
-            security_respose = security_chain.invoke(message)
-            if security_respose.content == '0':
-                response = story_chain.invoke(message)
+        if st.session_state.get('pending_dice_roll', False):
+            if st.button("주사위 굴림"):
+                dice_sentence = st.session_state['pending_dice_sentence']
+                dice_result = dice_roll(dice_sentence)
+                send_message(dice_result, role='human', save=True)
+                st.session_state['pending_dice_roll'] = False
+                st.session_state['dice_result'] = dice_result
+                st.experimental_rerun()  # 주사위 굴림 버튼을 안 보이게 하기 위해 페이지를 다시 로드합니다.
+        else:
+            if 'dice_result' in st.session_state:
+                dice_result = st.session_state.pop('dice_result')
+                response = story_chain.invoke(dice_result)
                 memory.save_context(
-                    {"inputs": message},
+                    {"inputs": dice_result},
                     {"outputs": response.content},
                 )
-
-                # send_message(memory.load_memory_variables({})["history"], "ai")
-                # send_message(memory.load_memory_variables({}), "ai", save=False)
-                #response = invoke_chain(retriever, message)
-                send_message(response.content, "ai")
-            else:
-                send_message("잘못된 입력입니다.", "ai")
+                send_message(response.content, role='ai', save=True)
+                if check_dice_roll_required(response.content):
+                    st.experimental_rerun()
+            message = st.chat_input("다음 행동을 입력하세요...")
+            if message:
+                send_message(message, "human")
+                security_chain = {"question": RunnablePassthrough()} | RunnablePassthrough.assign(
+                    abstract=load_memory) | security_prompt | security_llm
+                security_response = security_chain.invoke(message)
+                if security_response.content == '0':
+                    response = story_chain.invoke(message)
+                    memory.save_context(
+                        {"inputs": message},
+                        {"outputs": response.content},
+                    )
+                    send_message(response.content, "ai", save=True)
+                    if check_dice_roll_required(response.content):
+                        st.experimental_rerun()
+                else:
+                    send_message("잘못된 입력입니다.", "ai")
