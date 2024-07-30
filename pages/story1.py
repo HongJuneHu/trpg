@@ -20,7 +20,7 @@ from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import MessagesPlaceholder
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import CharacterTextSplitter
-
+import random
 
 # 환경 변수 로드
 load_dotenv()
@@ -93,7 +93,7 @@ def embed_file(file_path):
     cache_dir = LocalFileStore(f"./.cache/embeddings/{file_path}")
     splitter = CharacterTextSplitter.from_tiktoken_encoder(
         separator="\n",
-        chunk_size=3000,
+        chunk_size=2000,
         chunk_overlap=500,
     )
     loader = UnstructuredFileLoader(file_path)
@@ -118,6 +118,39 @@ def paint_history():
 
 def format_docs(docs):
     return "\n\n".join(document.page_content for document in docs)
+
+def dice_roll(sentence):
+    if "정신력" in sentence:
+        if random.randrange(1,11)>st.session_state['sanity']:
+            return "실패"
+        else:
+            return "성공"
+    elif "지능" in sentence:
+        if random.randrange(1,11)>st.session_state['int_stat']:
+            return "실패"
+        else:
+            return "성공"
+    elif "이성" in sentence:
+        if random.randrange(1,11)<6:
+            st.session_state['mental'] -= 1
+            return "실패"
+        else:
+            return "성공"
+    elif "마력" in sentence:
+        if random.randrange(1,11)>st.session_state['mp']:
+            return "실패"
+        else:
+            return "성공"
+    elif "관찰력" in sentence:
+        if random.randrange(1,11)>st.session_state['sight']:
+            return "실패"
+        else:
+            return "성공"
+    elif "민첩" in sentence:
+        if random.randrange(1,11)>st.session_state['dex']:
+            return "실패"
+        else:
+            return "성공"
 
 st.title("파도와 망각")
 
@@ -150,15 +183,19 @@ if st.session_state.step == 1:
         if name and age and job and face and personality and special:
             st.session_state["name"] = name
             st.session_state["age"] = age
-            st.session_state["job"] = job
-            st.session_state["face"] = face
+            #st.session_state["job"] = job
+            #st.session_state["face"] = face
             st.session_state["personality"] = personality
-            st.session_state["special"] = special
+            #st.session_state["special"] = special
             next_step()
         else:
             st.warning("모든 필드를 입력해주세요.")
 
 elif st.session_state.step == 2:
+    mental = 10
+
+    sanity = st.number_input('캐릭터의 정신력을 0에서 10사이의 숫자로 매긴다면 몇인가요?', min_value=0, max_value=10)
+
     int_stat = st.number_input('캐릭터의 지능을 0에서 10사이의 숫자로 매긴다면 몇인가요?', min_value=0, max_value=10)
 
     mp = st.number_input('캐릭터의 마력을 0에서 10사이의 숫자로 매긴다면 몇인가요?', min_value=0, max_value=10)
@@ -169,6 +206,8 @@ elif st.session_state.step == 2:
 
     if st.button("입력 완료"):
         if int_stat is not None and mp is not None and sight is not None and dex is not None:
+            st.session_state['sanity'] = sanity
+            st.session_state['mental'] = mental
             st.session_state["int_stat"] = int_stat
             st.session_state["mp"] = mp
             st.session_state["sight"] = sight
@@ -181,16 +220,13 @@ elif st.session_state.step == 3:
     st.session_state.character_sheet = f"""
     이름 : {st.session_state["name"]}\n
     나이 : {st.session_state["age"]}\n
-    직업 : {st.session_state["job"]}\n
-    외모 : {st.session_state["face"]}\n
     성격 : {st.session_state["personality"]}\n
-    특기 : {st.session_state["special"]}\n
     """
 
     st.session_state.stat_sheet = f"""
-    정신력 : 10\n
+    정신력 : {st.session_state['sanity']}\n
     지능 : {st.session_state["int_stat"]}\n
-    이성 : 10\n
+    이성 : {st.session_state['mental']}\n
     마력 : {st.session_state["mp"]}\n
     관찰력 : {st.session_state["sight"]}\n
     민첩 : {st.session_state["dex"]}\n
@@ -223,14 +259,14 @@ elif st.session_state.step == 4:
         """
     )
 
-    story_query = """         
-         KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 따라서 "KPC" 대신 적당한 이름을 생성하여 일관되게 사용하라. 이 이름은 너가 알아서 생성하고, 플레이어의 행동에 과한 개입은 하지 말라.
+    story_query = """
+         KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 따라서 "KPC"라는 캐릭터를 대체할 수 있는 캐릭터을 생성하여 일관되게 사용하라. 이 이름은 너가 알아서 생성하고, 플레이어의 행동에 과한 개입은 하지 말라.
          PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라.
 
          판정을 해야한다면 꼭 Context에서 요구하는 스탯에 대해서만 "[스탯]판정을 해주세요."와 같은 형식의 메시지를 출력하라.
          판정결과에 따라 성공 또는 실패에 따른 결과를 출력하라.
     
-         이야기의 흐름은 반드시 주어진 Context의 도입, 1일차 저녁, 2일차 오전, 2일차 오후, 3일차 오전 10시 순서로 따라가야한다. 또한 사용자의 명령에는 반응하되 진행하는 내용은 반드시 Context의 내용을 따라가야한다.
+         이야기의 흐름은 반드시 주어진 Context의 스토리 진행 순서대로 따라가야한다. 또한 플레이어의 명령에는 반응하되 플레이어의 캐릭터의 대사를 생성하거나 행동을 조종하지 않으며, 진행하는 내용은 반드시 Context의 내용을 따라가야한다.
          대답의 시작 부분에는 '[도입]' '[1일차 저녁]' 과 같이 게임 상 시간을 알려줘야한다.
          Following the storyline of the Context below, you are to act as a Narrator of a text-based adventure game. Your task is to describe the environment and supporting characters. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best-selling author. 무조건 한글로 말하세요.
          ----------
@@ -277,6 +313,22 @@ elif st.session_state.step == 4:
         [정신력] 판정합니다.
         """
         send_message(start_message, "ai", save=True)
+        temp = {"setting_info": retriever, "question": RunnablePassthrough()} | RunnablePassthrough.assign(
+            history=load_memory) | story_prompt | story_llm
+        dice_return = dice_roll(start_message)
+        response = temp.invoke(dice_return)
+        send_message(dice_return, "human", save = True)
+        send_message(response.content, "ai", save = True)
+
+        if '판정' in response.content:
+            dice_return = dice_roll(response.content)
+            send_message(dice_return, "human", save=True)
+            response = temp.invoke(dice_return)
+            send_message(response.content, "ai", save=True)
+            memory.save_context(
+                {"inputs": dice_return},
+                {"outputs": response.content},
+            )
 
         message = st.chat_input("다음 행동을 입력하세요...")
         memory.save_context(
@@ -302,5 +354,14 @@ elif st.session_state.step == 4:
                 # send_message(memory.load_memory_variables({}), "ai", save=False)
                 #response = invoke_chain(retriever, message)
                 send_message(response.content, "ai")
+                if '판정' in response.content:
+                    dice_return = dice_roll(response.content)
+                    send_message(dice_return, "human", save = True)
+                    response = story_chain.invoke(dice_return)
+                    send_message(response.content, "ai", save=True)
+                    memory.save_context(
+                        {"inputs": dice_return},
+                        {"outputs": response.content},
+                    )
             else:
                 send_message("잘못된 입력입니다.", "ai")
