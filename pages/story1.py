@@ -160,11 +160,18 @@ def is_dice(chain, input, sentence):
         {"outputs": sentence},
     )
     last_sentence = sentence.split('\n')
-    temp_sentence=[]
+    temp_sentence=["0"]
     for i in range(len(last_sentence)):
         if '판정' in last_sentence[i]:
             temp_sentence.append(last_sentence[i])
     if '판정' in temp_sentence[-1]:
+        st.button("주사위 굴리기")
+        if st.session_state.button_click_b == 0:
+            st.session_state.button_click_b += 1
+            st.stop()
+            st.rerun()
+        elif st.session_state.button_click_b == 1:
+            st.session_state.button_click_b -= 1
         send_message("1",role='ai')
         dice_result = dice_roll(temp_sentence[-1])
         send_message(dice_result, role='human', save=True)
@@ -181,13 +188,14 @@ def is_dice(chain, input, sentence):
 
 st.title("파도와 망각")
 
-if "messages" not in st.session_state:
+if "base_setting" not in st.session_state:
     st.session_state["messages"] = []
+    st.session_state.step = 1
+    st.session_state.button_click_b = 0
+    st.session_state.button_click_a = 1
+    st.session_state.base_setting = True
 
 file_path = "./story/파도와_망각.pdf"  # 로컬 파일 경로 지정
-
-if 'step' not in st.session_state:
-    st.session_state.step = 1
 
 def next_step():
     st.session_state.step += 1
@@ -287,8 +295,8 @@ elif st.session_state.step == 4:
     )
 
     story_query = """
-         KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 따라서 "KPC"라는 캐릭터를 대체할 수 있는 캐릭터을 생성하여 일관되게 사용하라. 이 이름은 너가 알아서 생성하고, 플레이어의 행동에 과한 개입은 하지 말라.
-         PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라.
+         KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. "KPC" 대신 캐릭터 이름을 생성하여 일관되게 사용하라. 이름은 랜덤으로 생성하고, 플레이어의 행동에 과한 개입은 하지 말라.
+         PC는 플레이어가 조종하는 캐릭터로, 너가 직접 PC의 대사를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라.
 
          판정을 해야한다면 꼭 Context에서 요구하는 스탯에 대해서만 "[스탯]판정을 해주세요."와 같은 형식의 메시지를 출력하라.
          판정결과에 따라 성공 또는 실패에 따른 결과를 출력하라.
@@ -342,6 +350,9 @@ elif st.session_state.step == 4:
         [정신력] 판정합니다.
         """
         send_message(start_message, "ai", save=True)
+        # test = st.button("주사위 굴리기")
+        # if not test:
+        #     st.stop()
         start_message = is_dice(story_chain, "게임시작", start_message)
         # message = st.chat_input("다음 행동을 입력하세요...")
         st.session_state.first = False
@@ -366,5 +377,6 @@ elif st.session_state.step == 4:
                 # send_message(memory.load_memory_variables({}), "ai", save=False)
                 #response = invoke_chain(retriever, message)
                 send_message(response.content, "ai")
+                st.rerun()
             else:
                 send_message("잘못된 입력입니다.", "ai")
