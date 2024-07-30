@@ -50,22 +50,22 @@ st.set_page_config(
 )
 
 story_llm = ChatOpenAI(
-    model = 'gpt-4o-mini',
+    model='gpt-4o-mini',
     temperature=0.1,
-    tiktoken_model_name = 'gpt-3.5-turbo-0613',
-    streaming = True
+    tiktoken_model_name='gpt-3.5-turbo-0613',
+    streaming=True
 )
 
 security_llm = ChatOpenAI(
-    model = 'gpt-4o-mini',
+    model='gpt-4o-mini',
     temperature=0,
-    tiktoken_model_name = 'gpt-3.5-turbo-0613'
+    tiktoken_model_name='gpt-3.5-turbo-0613'
 )
 
 name_llm = ChatOpenAI(
-    model = 'gpt-4o-mini',
+    model='gpt-4o-mini',
     temperature=1,
-    tiktoken_model_name = 'gpt-3.5-turbo-0613'
+    tiktoken_model_name='gpt-3.5-turbo-0613'
 )
 
 if 'memory' not in st.session_state:
@@ -81,8 +81,10 @@ if 'first' not in st.session_state:
 
 memory = st.session_state.memory
 
+
 def load_memory(_):
     return memory.load_memory_variables({})["history"]
+
 
 def invoke_chain(retriever, question):
     result = story_chain.invoke({"setting_info": retriever, "question": question})
@@ -91,6 +93,7 @@ def invoke_chain(retriever, question):
         {"outputs": result.content},
     )
     return result
+
 
 @st.cache_resource(show_spinner="Embedding file...")
 def embed_file(file_path):
@@ -117,6 +120,7 @@ def send_message(message, role, save=True):
     if save:
         st.session_state['messages'].append({"message": message, "role": role})
 
+
 def paint_history():
     for message in st.session_state['messages']:
         send_message(message["message"], message["role"], save=False)
@@ -125,20 +129,18 @@ def paint_history():
 def format_docs(docs):
     return "\n\n".join(document.page_content for document in docs)
 
+
 def dice_roll(sentence):
     dice_result = random.randrange(1, 11)
-    update_sidebar()  # 초기 사이드바 업데이트
     if "정신력" in sentence:
         if dice_result < 6:
             st.session_state['sanity'] -= 1
-            update_sidebar()  # 스탯 변동 후 사이드바 업데이트
             return f"주사위 결과 : {dice_result}, [정신력] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [정신력] 판정 성공"
     elif "체력" in sentence:
         if dice_result < 6:
             st.session_state['health'] -= 1
-            update_sidebar()  # 스탯 변동 후 사이드바 업데이트
             return f"주사위 결과 : {dice_result}, [체력] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [체력] 판정 성공"
@@ -150,7 +152,6 @@ def dice_roll(sentence):
     elif "이성" in sentence:
         if dice_result < 6:
             st.session_state['mental'] -= 1
-            update_sidebar()  # 스탯 변동 후 사이드바 업데이트
             return f"주사위 결과 : {dice_result}, [이성] 판정 실패\n 현재 상태 :\n 이성 : {st.session_state['mental']}"
         else:
             return f"주사위 결과 : {dice_result}, [이성] 판정 성공\n 현재 상태 :\n 이성 : {st.session_state['mental']}"
@@ -169,11 +170,7 @@ def dice_roll(sentence):
             return f"주사위 결과 : {dice_result}, [민첩] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [민첩] 판정 성공"
-    elif "근력" in sentence:
-        if dice_result > 6:
-            return f"주사위 결과 : {dice_result}, [근력] 판정 실패"
-        else:
-            return f"주사위 결과 : {dice_result}, [근력] 판정 성공"
+
 
 # ai의 메시지를 받으면 마지막 문장에 판정이라는 단어가 있는지 확인하고 있으면 다이스굴리기, 있을 경우 다이스 결과를 human으로, 결과에 따른 ai메시지를 반환해야함
 # def is_dice(chain, input, sentence):
@@ -207,12 +204,14 @@ def check_dice_roll_required(text):
         return True
     return False
 
+
 def is_dice(input, sentence):
     memory.save_context(
         {"inputs": input},
         {"outputs": sentence},
     )
     return check_dice_roll_required(sentence)
+
 
 st.title("파도와 망각")
 
@@ -227,9 +226,11 @@ if 'step' not in st.session_state:
 if 'kpc_name' not in st.session_state:
     st.session_state.kpc_name = name_llm.invoke("답변은 \"니콜\", \"마이클\", \"김수혁\" 같이 사람 이름으로만 해서 사람 이름 하나 만들어줘").content
 
+
 def next_step():
     st.session_state.step += 1
     st.rerun()
+
 
 def update_sidebar():
     with st.sidebar:
@@ -237,6 +238,7 @@ def update_sidebar():
         st.header("체력 : " + ("♥" * st.session_state['health']) + ("♡" * (3 - st.session_state['health'])))
         st.header("정신력 : " + ("●" * st.session_state['sanity']) + ("○" * (3 - st.session_state['sanity'])))
         st.header("이성 : " + ("■" * st.session_state['mental']) + ("□" * (3 - st.session_state['mental'])))
+
 
 if st.session_state.step == 1:
     name = st.text_input("당신의 이름을 입력해주세요.", key='name_input')
@@ -255,10 +257,10 @@ if st.session_state.step == 1:
         if name and age and job and face and personality and special:
             st.session_state["name"] = name
             st.session_state["age"] = age
-            #st.session_state["job"] = job
-            #st.session_state["face"] = face
+            # st.session_state["job"] = job
+            # st.session_state["face"] = face
             st.session_state["personality"] = personality
-            #st.session_state["special"] = special
+            # st.session_state["special"] = special
             next_step()
         else:
             st.warning("모든 필드를 입력해주세요.")
@@ -327,29 +329,28 @@ elif st.session_state.step == 4:
         세상이 멸망한 지도 벌써 10여 년이 흘렀습니다.
         우리는 함께 멸망한 세상을 여행하고 있습니다.
         기나긴 여행도 이제 막바지에 다다랐습니다.
-    
+
         영국에서 가장 아름답다는, 새하얀 절벽과 바다를 이웃한 세븐시스터즈.
         당신은 그곳에서 지울 수 없는 위화감을 느낍니다.
-    
+
         우리는 분명히 ◼ ◼◼◼ ◼◼◼◼….
-    
+
         파도 소리가 귓가를 스칩니다. 머릿속이 혼란하게 흔들립니다.
         …우리가 왜 이 여행을 하고 있었죠?
         """
     )
 
-    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라. KPC의 이름은 {st.session_state.kpc_name}이다. {st.session_state.kpc_name}으로 수정하여 출력하라.\n"
+    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라. KPC의 이름은 {st.session_state.kpc_name}이다. You CAN'T use 'KPC' word.\n"
 
     story_query = """
-         KPC는 플레이어가 Context의 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터이다. 플레이어의 행동에 과한 개입은 하지 말라.
-         PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라.
+         PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라. 또한 PC라는 단어를 언급해서는 안된다.
 
          판정을 해야한다면 꼭 Context에서 요구하는 스탯에 대해서만 "[스탯]판정을 해주세요."와 같은 형식의 메시지를 출력하라.
          판정결과에 따라 성공 또는 실패에 따른 결과를 출력하라.
-    
+
          이야기의 흐름은 반드시 주어진 Context의 스토리 진행 순서대로 따라가야한다. 또한 플레이어의 명령에는 반응하되 플레이어의 캐릭터의 대사를 생성하거나 행동을 조종하지 않으며, 진행하는 내용은 반드시 Context의 내용을 따라가야한다.
-         대답의 시작 부분에는 '[도입]' '[1일차 저녁]' 과 같이 게임 상 시간을 알려줘야한다. 주사위 판정이 필요할 때 (1/1D2)와 같은 내용은 출력하지 않는다.
-         
+         대답의 시작 부분에는 '[도입]' '[1일차 저녁]' 과 같이 게임 상 시간을 알려줘야한다.
+
          Following the storyline of the Context below, you are to act as a Narrator of a text-based adventure game. Your task is to describe the environment and supporting characters. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best-selling author. 무조건 한글로 말하세요.
          ----------
          Context : 
@@ -369,11 +370,10 @@ elif st.session_state.step == 4:
 
     security_query = """
             너는 TRPG 게임의 입력으로 알맞는지 판단하는 분류 모델 역할을 수행할거야.
-            '.', ',', '!' 같은 무의미한 입력이나 주어진 상황에서 전혀 맞지 않는 행동을 하면 '1'을 반환하고 게임과 관련된 질문이나 무엇을 할 수 있는지 물어보거나 주어진 게임 상황에서 할 수 있는 행동을 입력 받으면 '0'을 반환해.
-            다만 정말 말도 안되는게 아니라면 '0'을 반환해.
-            
+            '.', ',', '!' 같은 무의미한 입력이면 '1'을 반환하고 게임과 관련된 질문이나 무엇을 할 수 있는지 물어보거나 주어진 게임 상황에서 할 수 있는 행동을 입력 받으면 '0'을 반환해.
+
             현재 상황은 다음과 같다.
-            
+
             {abstract}
             """
 
@@ -383,9 +383,6 @@ elif st.session_state.step == 4:
          ),
         ("human", "{question}")
     ])
-
-
-
 
     retriever = embed_file(file_path)
     story_chain = {"setting_info": retriever, "question": RunnablePassthrough()} | RunnablePassthrough.assign(
@@ -415,6 +412,7 @@ elif st.session_state.step == 4:
                 send_message(dice_result, role='human', save=True)
                 st.session_state['pending_dice_roll'] = False
                 st.session_state['dice_result'] = dice_result
+                update_sidebar()  # 주사위 굴림 후 스탯 변동 반영
                 st.rerun()  # 주사위 굴림 버튼을 안 보이게 하기 위해 페이지를 다시 로드합니다.
         else:
             if 'dice_result' in st.session_state:
@@ -425,7 +423,6 @@ elif st.session_state.step == 4:
                     {"outputs": response.content},
                 )
                 send_message(response.content, role='ai', save=True)
-                update_sidebar()  # 스탯 변동 후 사이드바 업데이트
                 if check_dice_roll_required(response.content):
                     st.rerun()
             message = st.chat_input("다음 행동을 입력하세요...")
