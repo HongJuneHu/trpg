@@ -378,7 +378,7 @@ elif st.session_state.step == 4:
                 send_message(dice_result, role='human', save=True)
                 st.session_state['pending_dice_roll'] = False
                 st.session_state['dice_result'] = dice_result
-                st.experimental_rerun()  # 주사위 굴림 버튼을 안 보이게 하기 위해 페이지를 다시 로드합니다.
+                st.rerun()  # 주사위 굴림 버튼을 안 보이게 하기 위해 페이지를 다시 로드합니다.
         else:
             if 'dice_result' in st.session_state:
                 dice_result = st.session_state.pop('dice_result')
@@ -389,7 +389,7 @@ elif st.session_state.step == 4:
                 )
                 send_message(response.content, role='ai', save=True)
                 if check_dice_roll_required(response.content):
-                    st.experimental_rerun()
+                    st.rerun()
             message = st.chat_input("다음 행동을 입력하세요...")
             if message:
                 send_message(message, "human")
@@ -404,6 +404,6 @@ elif st.session_state.step == 4:
                     )
                     send_message(response.content, "ai", save=True)
                     if check_dice_roll_required(response.content):
-                        st.experimental_rerun()
+                        st.rerun()
                 else:
                     send_message("잘못된 입력입니다.", "ai")
