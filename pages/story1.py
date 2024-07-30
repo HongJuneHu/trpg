@@ -51,7 +51,7 @@ st.set_page_config(
 
 story_llm = ChatOpenAI(
     model = 'gpt-4o-mini',
-    temperature=0.5,
+    temperature=0.1,
     tiktoken_model_name = 'gpt-3.5-turbo-0613',
     streaming = True
 )
@@ -65,7 +65,7 @@ security_llm = ChatOpenAI(
 if 'memory' not in st.session_state:
     st.session_state.memory = ConversationBufferWindowMemory(
         llm=story_llm,
-        max_token_limit=1500,
+        max_token_limit=2000,
         memory_key="history",
         return_messages=True,
     )
@@ -122,35 +122,55 @@ def format_docs(docs):
 def dice_roll(sentence):
     if "정신력" in sentence:
         if random.randrange(1,11)>st.session_state['sanity']:
-            return "실패"
+            return "[정신력] 판정 실패"
         else:
-            return "성공"
+            return "[정신력] 판정 성공"
     elif "지능" in sentence:
         if random.randrange(1,11)>st.session_state['int_stat']:
-            return "실패"
+            return "[지능] 판정 실패"
         else:
-            return "성공"
+            return "[지능] 판정 성공"
     elif "이성" in sentence:
         if random.randrange(1,11)<6:
             st.session_state['mental'] -= 1
-            return "실패"
+            return "[이성] 판정 실패"
         else:
-            return "성공"
+            return "[이성] 판정 성공"
     elif "마력" in sentence:
         if random.randrange(1,11)>st.session_state['mp']:
-            return "실패"
+            return "[마력] 판정 실패"
         else:
-            return "성공"
+            return "[마력] 판정 성공"
     elif "관찰력" in sentence:
         if random.randrange(1,11)>st.session_state['sight']:
-            return "실패"
+            return "[관찰력] 판정 실패"
         else:
-            return "성공"
+            return "[관찰력] 판정 성공"
     elif "민첩" in sentence:
         if random.randrange(1,11)>st.session_state['dex']:
-            return "실패"
+            return "[민첩] 판정 실패"
         else:
-            return "성공"
+            return "[민첩] 판정 성공"
+
+# ai의 메시지를 받으면 마지막 문장에 판정이라는 단어가 있는지 확인하고 있으면 다이스굴리기, 있을 경우 다이스 결과를 human으로, 결과에 따른 ai메시지를 반환해야함
+def is_dice(chain, input, sentence):
+    memory.save_context(
+        {"inputs": input},
+        {"outputs": sentence},
+    )
+    last_sentence = sentence.split('\n')[-1]
+    if '판정' in last_sentence:
+        if st.button("주사위 굴리기"):
+            dice_result = dice_roll(last_sentence)
+            send_message(dice_result, role='human', save=True)
+            response = chain.invoke(dice_result)
+            memory.save_context(
+                {"inputs": dice_result},
+                {"outputs": response.content},
+            )
+            return response
+    else:
+        return sentence
 
 st.title("파도와 망각")
 
@@ -301,6 +321,8 @@ elif st.session_state.step == 4:
     ])
 
     retriever = embed_file(file_path)
+    story_chain = {"setting_info": retriever, "question": RunnablePassthrough()} | RunnablePassthrough.assign(
+        history=load_memory) | story_prompt | story_llm
     if st.session_state.first:
         start_message = """
         당신은 머리가 어지러워지면서 동시에 바닷속으로 빠지는 듯한 감각을 느낍니다...
@@ -313,55 +335,28 @@ elif st.session_state.step == 4:
         [정신력] 판정합니다.
         """
         send_message(start_message, "ai", save=True)
-        temp = {"setting_info": retriever, "question": RunnablePassthrough()} | RunnablePassthrough.assign(
-            history=load_memory) | story_prompt | story_llm
-        dice_return = dice_roll(start_message)
-        response = temp.invoke(dice_return)
-        send_message(dice_return, "human", save = True)
-        send_message(response.content, "ai", save = True)
-
-        if '판정' in response.content:
-            dice_return = dice_roll(response.content)
-            send_message(dice_return, "human", save=True)
-            response = temp.invoke(dice_return)
-            send_message(response.content, "ai", save=True)
-            memory.save_context(
-                {"inputs": dice_return},
-                {"outputs": response.content},
-            )
-
+        start_message = is_dice(story_chain, "게임시작", start_message)
         message = st.chat_input("다음 행동을 입력하세요...")
-        memory.save_context(
-            {"inputs": '게임 시작'},
-            {"outputs": start_message}
-        )
         st.session_state.first = False
+        st.rerun()
     else:
         paint_history()
+
         message = st.chat_input("다음 행동을 입력하세요...")
         if message:
             send_message(message, "human")
             security_chain = {"question": RunnablePassthrough()} | RunnablePassthrough.assign(abstract = load_memory) | security_prompt | security_llm
             security_respose = security_chain.invoke(message)
             if security_respose.content == '0':
-                story_chain = {"setting_info" : retriever, "question":RunnablePassthrough()} | RunnablePassthrough.assign(history=load_memory) | story_prompt | story_llm
                 response = story_chain.invoke(message)
                 memory.save_context(
                     {"inputs": message},
                     {"outputs": response.content},
                 )
+
                 # send_message(memory.load_memory_variables({})["history"], "ai")
                 # send_message(memory.load_memory_variables({}), "ai", save=False)
                 #response = invoke_chain(retriever, message)
                 send_message(response.content, "ai")
-                if '판정' in response.content:
-                    dice_return = dice_roll(response.content)
-                    send_message(dice_return, "human", save = True)
-                    response = story_chain.invoke(dice_return)
-                    send_message(response.content, "ai", save=True)
-                    memory.save_context(
-                        {"inputs": dice_return},
-                        {"outputs": response.content},
-                    )
             else:
                 send_message("잘못된 입력입니다.", "ai")
