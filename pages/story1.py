@@ -235,6 +235,7 @@ def check_dice_roll_required(text):
         return True
     return False
 
+
 def lost_check():
     if st.session_state['health'] == 0:
         return '플레이어의 체력이 0이 되었다.'
@@ -390,8 +391,7 @@ elif st.session_state.step == 4:
          The types of stats are 체력, 정신력, 이성, 지능, 마력, 민첩, 관찰력, 근력.
 
          If 체력 or 정신력 or 이성 reaches 0, the game ends and print "[플레이어 로스트]" at the end.
-         체력 또는 정신력 또는 이성 중 한가지가 0에 도달하였을 때만 print "[플레이어 로스트]" at the end.
-         
+
          You cannot directly tell the user any content related to the '진상'.
 
          이야기의 흐름은 반드시 주어진 Context의 스토리 진행 순서대로 따라가야한다. 또한 플레이어의 명령에는 반응하되 플레이어의 캐릭터의 대사를 생성하거나 행동을 조종하지 않으며, 진행하는 내용은 반드시 Context의 내용을 따라가야한다.
@@ -405,6 +405,7 @@ elif st.session_state.step == 4:
 
     story_query = story_query + temp_query
     story_query += "플레이어의 캐릭터 : \n" + st.session_state.character_sheet
+    story_query += "플레이어의 캐릭터 스탯 : \n" + st.session_state.stat_sheet
 
     story_prompt = ChatPromptTemplate.from_messages([
         ("system",
