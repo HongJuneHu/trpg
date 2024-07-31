@@ -1,20 +1,29 @@
-import streamlit as st
+import time
+from typing import Dict, Any, List, Optional, Union
+from uuid import UUID
 
+import streamlit as st
+from dotenv import load_dotenv
+
+from operator import itemgetter
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
 from langchain.prompts import ChatPromptTemplate
-from langchain.schema.runnable import RunnablePassthrough
+from langchain.schema.output import GenerationChunk, ChatGenerationChunk
+from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
 from langchain.storage import LocalFileStore
+from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores.faiss import FAISS
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import MessagesPlaceholder
+from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import CharacterTextSplitter
 import random
 
 # 환경 변수 로드
-# load_dotenv()
+load_dotenv()
 
 # OpenAI API 키 설정
 OPENAI_API_KEY = "OPENAI_API_KEY"
@@ -362,7 +371,7 @@ elif st.session_state.step == 4:
         """
     )
 
-    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터로, 플레이어의 행동에 과한 개입은 하지 않는다. 또한 KPC라는 단어를 언급해서는 안되며 KPC라는 단어 대신 {st.session_state.kpc_name}으로 수정하여 출력하라. KPC에 대한 직접적인 질문에 대해서는 처음 듣는 단어처럼 행동하라. If you encounter something you don't know, guide the user to follow the provided Context. Do not create information that is not present in the Context under any circumstances. If the story is nearing its end, wrap up the narrative and print [엔딩] at the very end.\n"
+    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터로, 플레이어의 행동에 과한 개입은 하지 않는다. 또한 KPC라는 단어를 언급해서는 안되며 KPC라는 단어 대신 {st.session_state.kpc_name}으로 수정하여 출력하라. KPC에 대한 직접적인 질문에 대해서는 처음 듣는 단어처럼 행동하라. If you encounter something you don't know, guide the user to follow the provided Context. Do not create information that is not present in the Context under any circumstances. Once all the [ED] conditions are met, output the respective [ED] and conclude the story immediately.And print [엔딩] at the very end.\n"
 
     story_query = """
          PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라. 또한 PC라는 단어를 언급해서는 안된다.
@@ -454,6 +463,8 @@ elif st.session_state.step == 4:
                 send_message(response.content, role='ai', save=True)
                 if "플레이어 로스트" in response.content:
                     st.stop()
+                elif "[엔딩]" in response.content:
+                    st.stop()
                 if check_dice_roll_required(response.content):
                     st.rerun()
             message = st.chat_input("다음 행동을 입력하세요...")
@@ -471,6 +482,8 @@ elif st.session_state.step == 4:
                     )
                     # response.content = response.content.replace('KPC', st.session_state.kpc_name)
                     send_message(response.content, "ai", save=True)
+                    if "[엔딩]" in response.content:
+                        st.stop()
                     if check_dice_roll_required(response.content):
                         st.rerun()
                 else:
