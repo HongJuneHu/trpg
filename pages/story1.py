@@ -419,13 +419,14 @@ elif st.session_state.step == 4:
                     {"outputs": response.content},
                 )
                 send_message(response.content, role='ai', save=True)
-                if "플레이어 로스트" in response.content:
-                    st.stop()
-                elif "[엔딩]" in response.content:
-                    st.stop()
                 if check_dice_roll_required(response.content):
                     st.rerun()
-            message = st.chat_input("다음 행동을 입력하세요...")
+            if "플레이어 로스트" in response.content:
+                st.stop()
+            elif "[엔딩]" in response.content:
+                st.stop()
+            else:
+                message = st.chat_input("다음 행동을 입력하세요...")
             if message:
                 send_message(message, "human")
                 security_chain = {"question": RunnablePassthrough()} | RunnablePassthrough.assign(
