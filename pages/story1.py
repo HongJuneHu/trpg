@@ -51,7 +51,7 @@ st.set_page_config(
 
 story_llm = ChatOpenAI(
     model='gpt-4o-mini',
-    temperature=0.1,
+    temperature=0,
     tiktoken_model_name='gpt-3.5-turbo-0613',
     streaming=True
 )
@@ -170,6 +170,11 @@ def dice_roll(sentence):
             return f"주사위 결과 : {dice_result}, [민첩] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [민첩] 판정 성공"
+    elif "근력" in sentence:
+        if dice_result > 6:
+            return f"주사위 결과 : {dice_result}, [근력] 판정 실패"
+        else:
+            return f"주사위 결과 : {dice_result}, [근력] 판정 성공"
 
 
 # ai의 메시지를 받으면 마지막 문장에 판정이라는 단어가 있는지 확인하고 있으면 다이스굴리기, 있을 경우 다이스 결과를 human으로, 결과에 따른 ai메시지를 반환해야함
@@ -191,15 +196,24 @@ def dice_roll(sentence):
 #         st.session_state['pending_dice_roll'] = False
 #         return sentence
 
+# def check_dice_roll_required(text):
+#     last_sentence = text.split('\n')
+#     temp_sentence = ["0"]
+#     for i in range(len(last_sentence)):
+#         if '판정' in last_sentence[i]:
+#             temp_sentence.append(last_sentence[i])
+#     if '판정' in temp_sentence[-1]:
+#         st.session_state['pending_dice_roll'] = True
+#         st.session_state['pending_dice_sentence'] = temp_sentence[-1]
+#         send_message("주사위 판정이 필요합니다.", role='ai')
+#         return True
+#     return False
+
 def check_dice_roll_required(text):
-    last_sentence = text.split('\n')
-    temp_sentence = ["0"]
-    for i in range(len(last_sentence)):
-        if '판정' in last_sentence[i]:
-            temp_sentence.append(last_sentence[i])
-    if '판정' in temp_sentence[-1]:
+    last_sentence = [string for string in text.splitlines() if string.strip()][-1]
+    if '판정' in last_sentence:
         st.session_state['pending_dice_roll'] = True
-        st.session_state['pending_dice_sentence'] = temp_sentence[-1]
+        st.session_state['pending_dice_sentence'] = last_sentence
         send_message("주사위 판정이 필요합니다.", role='ai')
         return True
     return False
@@ -352,6 +366,7 @@ elif st.session_state.step == 4:
          대답의 시작 부분에는 '[도입]' '[1일차 저녁]' 과 같이 게임 상 시간을 알려줘야한다.
 
          Following the storyline of the Context below, you are to act as a Narrator of a text-based adventure game. Your task is to describe the environment and supporting characters. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best-selling author. 무조건 한글로 말하세요.
+         Except for the story of the context, no other story should be added or modified.
          ----------
          Context : 
          {setting_info}
