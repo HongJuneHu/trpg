@@ -1,21 +1,29 @@
+import time
+from typing import Dict, Any, List, Optional, Union
+from uuid import UUID
+
 import streamlit as st
 from dotenv import load_dotenv
 
+from operator import itemgetter
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
 from langchain.prompts import ChatPromptTemplate
-from langchain.schema.runnable import RunnablePassthrough
+from langchain.schema.output import GenerationChunk, ChatGenerationChunk
+from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
 from langchain.storage import LocalFileStore
+from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores.faiss import FAISS
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import MessagesPlaceholder
+from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import CharacterTextSplitter
 import random
 
 # 환경 변수 로드
-# load_dotenv()
+load_dotenv()
 
 # OpenAI API 키 설정
 OPENAI_API_KEY = "OPENAI_API_KEY"
@@ -185,6 +193,39 @@ def dice_roll(sentence):
         else:
             return f"주사위 결과 : {dice_result}, [근력] 판정 성공"
 
+
+# ai의 메시지를 받으면 마지막 문장에 판정이라는 단어가 있는지 확인하고 있으면 다이스굴리기, 있을 경우 다이스 결과를 human으로, 결과에 따른 ai메시지를 반환해야함
+# def is_dice(chain, input, sentence):
+#     memory.save_context(
+#         {"inputs": input},
+#         {"outputs": sentence},
+#     )
+#     last_sentence = sentence.split('\n')
+#     temp_sentence=["0"]
+#     for i in range(len(last_sentence)):
+#         if '판정' in last_sentence[i]:
+#             temp_sentence.append(last_sentence[i])
+#     if '판정' in temp_sentence[-1]:
+#         st.session_state['pending_dice_roll'] = True
+#         st.session_state['pending_dice_sentence'] = temp_sentence[-1]
+#         send_message("주사위 판정이 필요합니다.", role='ai')
+#     else:
+#         st.session_state['pending_dice_roll'] = False
+#         return sentence
+
+# def check_dice_roll_required(text):
+#     last_sentence = text.split('\n')
+#     temp_sentence = ["0"]
+#     for i in range(len(last_sentence)):
+#         if '판정' in last_sentence[i]:
+#             temp_sentence.append(last_sentence[i])
+#     if '판정' in temp_sentence[-1]:
+#         st.session_state['pending_dice_roll'] = True
+#         st.session_state['pending_dice_sentence'] = temp_sentence[-1]
+#         send_message("주사위 판정이 필요합니다.", role='ai')
+#         return True
+#     return False
+
 def check_dice_roll_required(text):
     last_sentence = [string for string in text.splitlines() if string.strip()][-1]
     if '판정' in last_sentence:
@@ -192,6 +233,15 @@ def check_dice_roll_required(text):
         st.session_state['pending_dice_sentence'] = last_sentence
         send_message("주사위 판정이 필요합니다.", role='ai')
         return True
+    return False
+
+def lost_check():
+    if st.session_state['health'] == 0:
+        return '플레이어의 체력이 0이 되었다.'
+    elif st.session_state['mental'] == 0:
+        return '플레이어의 이성이 0이 되었다.'
+    elif st.session_state['sanity'] == 0:
+        return '플레이어의 정신력이 0이 되었다.'
     return False
 
 
@@ -330,7 +380,7 @@ elif st.session_state.step == 4:
         """
     )
 
-    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터로, 플레이어의 행동에 과한 개입은 하지 않는다. 또한 KPC라는 단어를 언급해서는 안되며 KPC라는 단어 대신 {st.session_state.kpc_name}으로 수정하여 출력하라. KPC에 대한 직접적인 질문에 대해서는 처음 듣는 단어처럼 행동하라. If you encounter something you don't know, guide the user to follow the provided Context. Do not create information that is not present in the Context under any circumstances. Once all the [ED] conditions are met, output the respective [ED] and conclude the story immediately.And print [엔딩] at the very end.\n"
+    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터로, 플레이어의 행동에 과한 개입은 하지 않는다. Avoid printing the term 'KPC' under any circumstances.KPC라는 단어 대신 {st.session_state.kpc_name}으로 수정하여 출력하라. KPC에 대한 직접적인 질문에 대해서는 처음 듣는 단어처럼 행동하라. If you encounter something you don't know, guide the user to follow the provided Context. Do not create information that is not present in the Context under any circumstances. Once all the [ED] conditions are met, output the respective [ED] and conclude the story immediately.And print [엔딩] at the very end.\n"
 
     story_query = """
          PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라. 또한 PC라는 단어를 언급해서는 안된다.
@@ -339,8 +389,7 @@ elif st.session_state.step == 4:
          Depending on the result of the check, output the outcome of success or failure.
          The types of stats are 체력, 정신력, 이성, 지능, 마력, 민첩, 관찰력, 근력.
 
-         If any of the player's character's 체력, 정신력, or 이성 drops to 0, the game ends and print "[플레이어 로스트]" at the end.
-         If 체력 reaches 0, the character dies. If 정신력 or 이성 reaches 0, the character goes insane, and the game ends.
+         If 체력 or 정신력 or 이성 reaches 0, the game ends and print "[플레이어 로스트]" at the end.
          
          You cannot directly tell the user any content related to the '진상'.
 
@@ -397,6 +446,7 @@ elif st.session_state.step == 4:
         """
         send_message(start_message, "ai", save=True)
         start_message = is_dice("게임시작", start_message)
+        # message = st.chat_input("다음 행동을 입력하세요...")
         st.session_state.first = False
         st.rerun()
     else:
@@ -409,6 +459,12 @@ elif st.session_state.step == 4:
                 st.session_state['pending_dice_roll'] = False
                 st.session_state['dice_result'] = dice_result
                 update_sidebar()  # 주사위 굴림 후 스탯 변동 반영
+                lost = lost_check()
+                if lost:
+                    response = story_chain.invoke(lost)
+                    send_message(response.content, role='ai', save=True)
+                    if "플레이어 로스트" in response.content:
+                        st.stop()
                 st.rerun()  # 주사위 굴림 버튼을 안 보이게 하기 위해 페이지를 다시 로드합니다.
         else:
             if 'dice_result' in st.session_state:
@@ -419,16 +475,20 @@ elif st.session_state.step == 4:
                     {"outputs": response.content},
                 )
                 send_message(response.content, role='ai', save=True)
+                lost = lost_check()
+                if lost:
+                    response = story_chain.invoke(lost)
+                    send_message(response.content, role='ai', save=True)
+                    if "플레이어 로스트" in response.content:
+                        st.stop()
+                if "[엔딩]" in response.content:
+                    st.stop()
                 if check_dice_roll_required(response.content):
                     st.rerun()
-            if "플레이어 로스트" in response.content:
-                st.stop()
-            elif "[엔딩]" in response.content:
-                st.stop()
-            else:
-                message = st.chat_input("다음 행동을 입력하세요...")
+            message = st.chat_input("다음 행동을 입력하세요...")
             if message:
                 send_message(message, "human")
+                # message = message.replace(st.session_state.kpc_name, 'KPC')
                 security_chain = {"question": RunnablePassthrough()} | RunnablePassthrough.assign(
                     abstract=load_memory) | security_prompt | security_llm
                 security_response = security_chain.invoke(message)
@@ -438,7 +498,14 @@ elif st.session_state.step == 4:
                         {"inputs": message},
                         {"outputs": response.content},
                     )
+                    # response.content = response.content.replace('KPC', st.session_state.kpc_name)
                     send_message(response.content, "ai", save=True)
+                    lost = lost_check()
+                    if lost:
+                        response = story_chain.invoke(lost)
+                        send_message(response.content, role='ai', save=True)
+                        if "플레이어 로스트" in response.content:
+                            st.stop()
                     if "[엔딩]" in response.content:
                         st.stop()
                     if check_dice_roll_required(response.content):
