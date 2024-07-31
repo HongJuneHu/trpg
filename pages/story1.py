@@ -1,29 +1,21 @@
-import time
-from typing import Dict, Any, List, Optional, Union
-from uuid import UUID
-
 import streamlit as st
 from dotenv import load_dotenv
 
-from operator import itemgetter
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
 from langchain.prompts import ChatPromptTemplate
-from langchain.schema.output import GenerationChunk, ChatGenerationChunk
-from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
+from langchain.schema.runnable import RunnablePassthrough
 from langchain.storage import LocalFileStore
-from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores.faiss import FAISS
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import MessagesPlaceholder
-from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import CharacterTextSplitter
 import random
 
 # 환경 변수 로드
-load_dotenv()
+# load_dotenv()
 
 # OpenAI API 키 설정
 OPENAI_API_KEY = "OPENAI_API_KEY"
@@ -192,39 +184,6 @@ def dice_roll(sentence):
             return f"주사위 결과 : {dice_result}, [근력] 판정 실패"
         else:
             return f"주사위 결과 : {dice_result}, [근력] 판정 성공"
-
-
-# ai의 메시지를 받으면 마지막 문장에 판정이라는 단어가 있는지 확인하고 있으면 다이스굴리기, 있을 경우 다이스 결과를 human으로, 결과에 따른 ai메시지를 반환해야함
-# def is_dice(chain, input, sentence):
-#     memory.save_context(
-#         {"inputs": input},
-#         {"outputs": sentence},
-#     )
-#     last_sentence = sentence.split('\n')
-#     temp_sentence=["0"]
-#     for i in range(len(last_sentence)):
-#         if '판정' in last_sentence[i]:
-#             temp_sentence.append(last_sentence[i])
-#     if '판정' in temp_sentence[-1]:
-#         st.session_state['pending_dice_roll'] = True
-#         st.session_state['pending_dice_sentence'] = temp_sentence[-1]
-#         send_message("주사위 판정이 필요합니다.", role='ai')
-#     else:
-#         st.session_state['pending_dice_roll'] = False
-#         return sentence
-
-# def check_dice_roll_required(text):
-#     last_sentence = text.split('\n')
-#     temp_sentence = ["0"]
-#     for i in range(len(last_sentence)):
-#         if '판정' in last_sentence[i]:
-#             temp_sentence.append(last_sentence[i])
-#     if '판정' in temp_sentence[-1]:
-#         st.session_state['pending_dice_roll'] = True
-#         st.session_state['pending_dice_sentence'] = temp_sentence[-1]
-#         send_message("주사위 판정이 필요합니다.", role='ai')
-#         return True
-#     return False
 
 def check_dice_roll_required(text):
     last_sentence = [string for string in text.splitlines() if string.strip()][-1]
@@ -438,7 +397,6 @@ elif st.session_state.step == 4:
         """
         send_message(start_message, "ai", save=True)
         start_message = is_dice("게임시작", start_message)
-        # message = st.chat_input("다음 행동을 입력하세요...")
         st.session_state.first = False
         st.rerun()
     else:
@@ -470,7 +428,6 @@ elif st.session_state.step == 4:
             message = st.chat_input("다음 행동을 입력하세요...")
             if message:
                 send_message(message, "human")
-                # message = message.replace(st.session_state.kpc_name, 'KPC')
                 security_chain = {"question": RunnablePassthrough()} | RunnablePassthrough.assign(
                     abstract=load_memory) | security_prompt | security_llm
                 security_response = security_chain.invoke(message)
@@ -480,7 +437,6 @@ elif st.session_state.step == 4:
                         {"inputs": message},
                         {"outputs": response.content},
                     )
-                    # response.content = response.content.replace('KPC', st.session_state.kpc_name)
                     send_message(response.content, "ai", save=True)
                     if "[엔딩]" in response.content:
                         st.stop()
