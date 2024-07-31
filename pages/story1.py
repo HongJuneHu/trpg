@@ -1,29 +1,20 @@
-import time
-from typing import Dict, Any, List, Optional, Union
-from uuid import UUID
-
 import streamlit as st
-from dotenv import load_dotenv
 
-from operator import itemgetter
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
 from langchain.prompts import ChatPromptTemplate
-from langchain.schema.output import GenerationChunk, ChatGenerationChunk
-from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
+from langchain.schema.runnable import RunnablePassthrough
 from langchain.storage import LocalFileStore
-from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores.faiss import FAISS
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import MessagesPlaceholder
-from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import CharacterTextSplitter
 import random
 
 # 환경 변수 로드
-load_dotenv()
+# load_dotenv()
 
 # OpenAI API 키 설정
 OPENAI_API_KEY = "OPENAI_API_KEY"
