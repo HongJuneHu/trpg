@@ -354,30 +354,24 @@ elif st.session_state.step == 4:
         """
     )
 
-    temp_query = f"The KPC is a character controlled by the narrator to guide the player through the story effectively. Do not overly interfere with the player's actions. The KPC's name is {st.session_state.kpc_name}. Can't use 'KPC'. Just use {st.session_state.kpc_name}.\n"
+    temp_query = f"KPC는 플레이어가 스토리를 잘 진행할 수 있도록 게임 내에서 내레이터가 조종하여 이끌어주는 캐릭터로, 플레이어의 행동에 과한 개입은 하지 않는다. 또한 KPC라는 단어를 언급해서는 안되며 KPC라는 단어 대신 {st.session_state.kpc_name}으로 수정하여 출력하라. KPC에 대한 직접적인 질문에 대해서는 처음 듣는 단어처럼 행동하라.          If you encounter something you don't know, guide the user to follow the provided Context. Do not create information that is not present in the Context under any circumstances.\n"
 
     story_query = """
-         The player character is controlled by the player, and you must not generate dialogues or control actions directly. Refer to the player as "you" or by their name, and do not mention the term "PC."
+         PC는 플레이어가 조종하는 캐릭터로, 너가 직접 대화를 생성하거나 행동을 조종해서는 안된다. 플레이어의 이름 또는 당신으로 수정하여 출력하라. 또한 PC라는 단어를 언급해서는 안된다.
 
-         If a skill check is required, only prompt for the specific stat needed by the context with a message like "[스탯]판정을 해주세요."
-         Depending on the result of the check, output the outcome of success or failure.
-         The types of stats are 체력, 정신력, 이성, 지능, 마력, 민첩, 관찰력, 근력.
+         판정을 해야한다면 꼭 Context에서 요구하는 스탯에 대해서만 "[스탯]판정을 해주세요."와 같은 형식의 메시지를 출력하라.
+         판정결과에 따라 성공 또는 실패에 따른 결과를 출력하라.
 
-         The story must follow the given context's storyline sequence. React to the player's commands but do not generate dialogues or control the player's character's actions. The progression of the story must strictly follow the context.
-         
-         If any of the player's character's 체력, 정신력, or 이성 drops to 0, the game ends and print "[플레이어 로스트]" at the end.
-         If 체력 reaches 0, the character dies. If 정신력 or 이성 reaches 0, the character goes insane, and the game ends.
-         
-         You cannot directly tell the user any content related to the '진상'.
+         이야기의 흐름은 반드시 주어진 Context의 스토리 진행 순서대로 따라가야한다. 또한 플레이어의 명령에는 반응하되 플레이어의 캐릭터의 대사를 생성하거나 행동을 조종하지 않으며, 진행하는 내용은 반드시 Context의 내용을 따라가야한다.
 
-         Following the storyline of the Context below, you are to act as a Narrator of a text-based adventure game. Your task is to describe the environment and supporting characters. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best-selling author. 무조건 한글로 말하세요.
-         Except for the story of the context, no other story should be added or modified.
+         Follow only the content of the Context. below, you are to act as a Narrator of a text-based adventure game. Your task is to describe the environment and supporting characters. There is a Player controlling the actions and speech of their player character (PC). You may never act or speak for the player character. The game proceeds in turns between the Narrator describing the situation and the player saying what the player character is doing. When speaking about the player character, use second-person point of view. Your output should be expertly written, as if written by a best-selling author. 무조건 한글로 말하세요.
+         If you encounter something you don't know, guide the user to follow the provided Context and DO NOT create information that is not present in the Context.
          ----------
          Context : 
          {setting_info}
          """
 
-    story_query = temp_query + story_query
+    story_query = story_query + temp_query
     story_query += "플레이어의 캐릭터 : \n" + st.session_state.character_sheet
 
     story_prompt = ChatPromptTemplate.from_messages([
@@ -439,7 +433,6 @@ elif st.session_state.step == 4:
             if 'dice_result' in st.session_state:
                 dice_result = st.session_state.pop('dice_result')
                 response = story_chain.invoke(dice_result)
-                response.content = response.content.replace("    ", "")
                 memory.save_context(
                     {"inputs": dice_result},
                     {"outputs": response.content},
@@ -458,7 +451,6 @@ elif st.session_state.step == 4:
                 security_response = security_chain.invoke(message)
                 if '0' in security_response.content:
                     response = story_chain.invoke(message)
-                    response.content = response.content.replace("    ", "")
                     memory.save_context(
                         {"inputs": message},
                         {"outputs": response.content},
